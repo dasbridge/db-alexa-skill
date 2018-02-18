@@ -145,12 +145,12 @@ export class DeviceService {
 
     discoverEndpoint(endpointId: string, thingMeta: ThingMetadata): AlexaDiscoveryEndpoint {
         //console.log('arguments:', JSON.stringify(arguments, null, 2))
-        const friendlyNameToUSe = FULL_TO_SHORT.exec(endpointId)[1]
+        const friendlyNameToUse = FULL_TO_SHORT.exec(endpointId)[1]
 
         let result: AlexaDiscoveryEndpoint = {
             endpointId: endpointId,
-            friendlyName: friendlyNameToUSe, // TODO
-            description: `${friendlyNameToUSe} Device`, // TODO
+            friendlyName: friendlyNameToUse, // TODO
+            description: `${friendlyNameToUse} Device`, // TODO
             manufacturerName: "the dasbridge project",
             capabilities: [],
             displayCategories: []
