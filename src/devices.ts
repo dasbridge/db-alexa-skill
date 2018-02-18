@@ -17,6 +17,8 @@ import * as jmespath from 'jmespath'
 import moment = require("moment");
 import {FULL_TO_SHORT} from "./thing";
 
+import uuidv4 = require('uuid/v4')
+
 let config = require('./config/stack.json') as GenericMap
 
 AWS.config.setPromisesDependency(Promise);
@@ -156,6 +158,8 @@ export class DeviceService {
             displayCategories: []
         }
 
+        let displayCategories = {}
+
         let hasTemperatureTimestamp = jmespath.search(thingMeta, 'metadata.reported."Alexa.TemperatureSensor"."3".temp.timestamp')
 
         if (hasTemperatureTimestamp && this.isLessThan30Minutes(hasTemperatureTimestamp)) {
@@ -172,7 +176,49 @@ export class DeviceService {
                 retrievable: true
             } as AlexaCapability)
 
-            result.displayCategories.push('TEMPERATURE_SENSOR')
+            displayCategories['TEMPERATURE_SENSOR'] = true
+        }
+
+        let hasColorController = jmespath.search(thingMeta, 'metadata.reported."Alexa.ColorController"."3".color.hue.timestamp')
+
+        if (hasColorController && this.isLessThan30Minutes(hasColorController)) {
+            result.capabilities.push({
+                type: "AlexaInterface",
+                interface: "Alexa.ColorController",
+                version: "3",
+                properties: {
+                    supported: [{name: "color"}]
+                },
+                proactivelyReported: true,
+                retrievable: true
+            } as AlexaCapability)
+
+            result.capabilities.push({
+                type: "AlexaInterface",
+                interface: "Alexa",
+                version: "3"
+            } as AlexaCapability)
+
+            displayCategories['LIGHT'] = true
+        }
+
+        let hasPowerController = jmespath.search(thingMeta, 'metadata.reported."Alexa.PowerController"."3".powerState.timestamp')
+
+        if (hasPowerController && this.isLessThan30Minutes(hasPowerController)) {
+            result.capabilities.push({
+                type: "AlexaInterface",
+                interface: "Alexa.PowerController",
+                version: "3",
+                properties: {
+                    supported: [{name: "state"}]
+                },
+                proactivelyReported: true,
+                retrievable: true
+            } as AlexaCapability)
+        }
+
+        for (let k of Object.keys(displayCategories)) {
+            result.displayCategories.push(k)
         }
 
         // metadata.reported."Alexa.TemperatureSensor"."3".temp.timestamp
@@ -234,9 +280,173 @@ export class DeviceService {
                 })
             }
 
+            let hasColorController = jmespath.search(thingMeta, 'metadata.reported."Alexa.ColorController"."3".color.hue.timestamp')
+
+            if (hasColorController && this.isLessThan30Minutes(hasColorController)) {
+                const curColor: { [k: string]: number } = {}
+
+                for (let k of ['hue', 'saturation', 'brightness']) {
+                    const colorValue = jmespath.search(thingMeta, `state.reported."Alexa.ColorController'."3".color.${k}`)
+
+                    curColor[k] = colorValue
+                }
+
+                const sampleTime = jmespath.search(thingMeta, `metadata.reported."Alexa.ColorController'."3".color.hue.timestamp`)
+
+                const timeOfSample = moment(sampleTime).utc().toISOString()
+
+                answer.context.properties.push({
+                    namespace: "Alexa.ColorController",
+                    name: "color",
+                    value: {
+                        hue: curColor['hue'].toFixed(1),
+                        saturation: curColor['saturation'].toFixed(4),
+                        brightness: curColor['brightness'].toFixed(4)
+                    },
+                    timeOfSample: timeOfSample,
+                    uncertaintyInMilliseconds: 1000
+                })
+            }
+
             return Promise.resolve(answer)
         })
 
+    }
+
+    setState(request: any, userProfile: UserProfile, endpointId: string, payload: any): Promise<any> {
+        const requestType = request.directive.header.namespace
+        const requestVersion = request.directive.header.payloadVersion
+
+        const answer = {
+            event: {
+                header: request.directive.header,
+                endpoint: {
+                    //scope: request.directive.endpoint.scope,
+                    endpointId: endpointId,
+                    scope: request.directive.endpoint.scope,
+                },
+                payload: {},
+            },
+            context: {
+                properties: [
+                    {
+                        namespace: request.directive.header.namespace,
+                        name: Object.keys(request.directive.payload)[0],
+                        value: payload[Object.keys(payload)[0]],
+                        timeOfSample: moment().utc().toISOString(),
+                        uncertaintyInMilliseconds: 1000,
+                    }
+                ]
+            }
+        }
+
+        //delete(answer.event.header.correlationToken)
+
+        answer.event.header.namespace = 'Alexa'
+        answer.event.header.name = 'Response'
+        answer.event.header.messageId = uuidv4();
+
+        console.log('setState: request', request, JSON.stringify(payload, null, 2))
+        console.log('setState: answer', JSON.stringify(answer, null, 2))
+
+        let endpointAddress: Iot.EndpointAddress;
+
+        let iotData: AWS.IotData
+
+        return Promise.resolve().then(() => {
+            return this.iot.describeEndpoint().promise()
+        }).then((describeEndpointResponse) => {
+            endpointAddress = describeEndpointResponse.endpointAddress;
+
+            iotData = new AWS.IotData({
+                endpoint: endpointAddress
+            })
+        }).then(() => {
+            const newPayload = {
+                state: {
+                    desired: {}
+                }
+            };
+
+            newPayload.state.desired[requestType] = {}
+            newPayload.state.desired[requestType][requestVersion] = payload
+
+            let updateThingShadowRequest = {
+                thingName: endpointId,
+                payload: JSON.stringify(newPayload, null, 2),
+            };
+            return iotData.updateThingShadow(updateThingShadowRequest).promise()
+        }).then(() => Promise.resolve(answer))
+    }
+
+    powerController(request: any, userProfile: UserProfile, endpointId: string): Promise<any> {
+        let desiredState = "ON"
+
+        if ("TurnOff" === request.directive.header.name) {
+            desiredState = "OFF"
+        }
+
+        const answer = {
+            event: {
+                header: request.directive.header,
+                endpoint: {
+                    //scope: request.directive.endpoint.scope,
+                    endpointId: endpointId,
+                    scope: request.directive.endpoint.scope
+                },
+                payload: {},
+            },
+            context: {
+                properties: [
+                    {
+                        namespace: request.directive.header.namespace,
+                        name: "powerState",
+                        value: desiredState,
+                        timeOfSample: moment().utc().toISOString(),
+                        uncertaintyInMilliseconds: 1000,
+                    }
+                ]
+            }
+        }
+
+        //delete(answer.event.header.correlationToken)
+
+        answer.event.header.namespace = 'Alexa'
+        answer.event.header.name = 'Response'
+        answer.event.header.messageId = uuidv4();
+
+        console.log('setState: request', request)
+        console.log('setState: answer', JSON.stringify(answer, null, 2))
+
+        let endpointAddress: Iot.EndpointAddress;
+
+        let iotData: AWS.IotData
+
+        return Promise.resolve().then(() => {
+            return this.iot.describeEndpoint().promise()
+        }).then((describeEndpointResponse) => {
+            endpointAddress = describeEndpointResponse.endpointAddress;
+
+            iotData = new AWS.IotData({
+                endpoint: endpointAddress
+            })
+        }).then(() => {
+            let updateThingShadowRequest = {
+                thingName: endpointId,
+                payload: JSON.stringify({
+                    state: {
+                        desired: {
+                            "Alexa.PowerController": {
+                                "3": {
+                                    powerState: desiredState
+                                }
+                            }
+                        }
+                    }
+                }, null, 2),
+            };
+            return iotData.updateThingShadow(updateThingShadowRequest).promise()
+        }).then(() => Promise.resolve(answer))
     }
 }
 
