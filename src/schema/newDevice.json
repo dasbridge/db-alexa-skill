@@ -1,0 +1,29 @@
+{
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "properties": {
+    "thingType": {
+      "$id": "/properties/thingType",
+      "type": "string",
+      "title": "Thing Type"
+    },
+    "thingId": {
+      "$id": "/properties/thingId",
+      "type": "string",
+      "title": "Thing Id",
+      "description": "Id for this Thing",
+      "minLength": 3,
+      "maxLength": 16,
+      "pattern": "^[a-z][a-zA-Z0-9\\-_]{2,}",
+      "examples": [
+        "myNewThing"
+      ]
+    }
+  },
+  "required": [
+    "thingType",
+    "thingId"
+  ]
+}

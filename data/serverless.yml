@@ -1,0 +1,185 @@
+service:
+  name: db-data
+
+plugins:
+  - serverless-stack-output
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: ${opt:stage, 'dev'}
+  region: us-east-1
+  memorySize: 1024
+  timeout: 30
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "*"
+      Resource: "*"
+
+resources:
+  Resources:
+    dbThingTypesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: "thing_type"
+            AttributeType: "S"
+        KeySchema:
+        - AttributeName: "thing_type"
+          KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    dbThingsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+        - AttributeName: "user_id"
+          AttributeType: "S"
+        - AttributeName: "thing_id"
+          AttributeType: "S"
+        - AttributeName: "thing_type"
+          AttributeType: "S"
+        - AttributeName: "thing_name"
+          AttributeType: "S"
+        KeySchema:
+        - AttributeName: "user_id"
+          KeyType: "HASH"
+        - AttributeName: "thing_id"
+          KeyType: "RANGE"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        GlobalSecondaryIndexes:
+        - IndexName: "thing_type-user_id-index"
+          KeySchema:
+          - AttributeName: "thing_type"
+            KeyType: "HASH"
+          - AttributeName: "user_id"
+            KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: "user_id-thing_name-index"
+          KeySchema:
+          - AttributeName: "user_id"
+            KeyType: "HASH"
+          - AttributeName: "thing_name"
+            KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: "thing_id-index"
+          KeySchema:
+          - AttributeName: "thing_id"
+            KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+    dbCustomerKeysTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+        - AttributeName: "short_id"
+          AttributeType: "S"
+        - AttributeName: "api_key"
+          AttributeType: "S"
+        KeySchema:
+        - AttributeName: "short_id"
+          KeyType: "HASH"
+        - AttributeName: "api_key"
+          KeyType: "RANGE"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        GlobalSecondaryIndexes:
+        - IndexName: "api_key-index"
+          KeySchema:
+          - AttributeName: "api_key"
+            KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+    dbCustomerTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+        - AttributeName: "user_id"
+          AttributeType: "S"
+        - AttributeName: "short_id"
+          AttributeType: "S"
+        - AttributeName: "email"
+          AttributeType: "S"
+        - AttributeName: "api_key"
+          AttributeType: "S"
+        KeySchema:
+        - AttributeName: "user_id"
+          KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        GlobalSecondaryIndexes:
+        - IndexName: "email-index"
+          KeySchema:
+          - AttributeName: "email"
+            KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: "apikey-index"
+          KeySchema:
+          - AttributeName: "api_key"
+            KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: "short_id-index"
+          KeySchema:
+          - AttributeName: "short_id"
+            KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+  Outputs:
+    ThingTypesTable:
+      Value:
+        "Fn::GetAtt": [ dbThingTypesTable, Arn ]
+      Export:
+        Name: ${self:service}:${self:provider.stage}:ThingTypesTableArn
+    CustomerTable:
+      Value:
+        "Fn::GetAtt": [ dbCustomerTable, Arn ]
+      Export:
+        Name: ${self:service}:${self:provider.stage}:CustomerTableArn
+    CustomerKeysTable:
+      Value:
+        "Fn::GetAtt": [ dbCustomerKeysTable, Arn ]
+      Export:
+        Name: ${self:service}:${self:provider.stage}:CustomerKeysTableArn
+    ThingsTable:
+      Value:
+        "Fn::GetAtt": [ dbThingsTable, Arn ]
+      Export:
+        Name: ${self:service}:${self:provider.stage}:ThingsTableArn
+    Region:
+      Value: ${self:provider.region}
+      Export:
+        Name: ${self:service}:${self:provider.stage}:Region
+
+custom:
+  output:
+    file: stack.json # toml, yaml, yml, and json format is available
