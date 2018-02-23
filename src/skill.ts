@@ -9,7 +9,14 @@ require('source-map-support').install();
 import {customerService, UserProfile} from "./customer";
 import {deviceService} from "./devices";
 
+/**
+ * Main dasBridge Skill
+ * @param request alexa request
+ * @param context lambda context
+ * @param cb callback
+ */
 export const main = (request, context, cb) => {
+    // Debugging Helper
     console.log('request:', JSON.stringify(request, null, 2))
 
     const requestType = request.directive.header.namespace
@@ -18,9 +25,15 @@ export const main = (request, context, cb) => {
 
     let namespace: string = null
 
+    // Auth Request?
     if ("Alexa.Authorization" === requestType) {
         const tokenType = request.directive.payload.scope.type
         const bearerToken = request.directive.payload.grantee.token
+
+        /**
+         * Custom, scoped error handler
+         * @param {Error} e Error
+         */
         const errorHandler = (e: Error) => {
             console.log("Oops: ", JSON.stringify(e, null, 2))
 
@@ -63,12 +76,19 @@ export const main = (request, context, cb) => {
         return
     }
 
+    /**
+     * Generic ErrorHandler
+     * @param {Error} e error
+     */
     const errorHandler = (e: Error) => {
         cb(e, JSON.stringify(e, null, 2))
 
         throw(e);
     }
 
+    /**
+     * Discovery Request
+     */
     if ("Alexa.Discovery" == requestType) {
         const tokenType = request.directive.payload.scope.type
         const bearerToken = request.directive.payload.scope.token
@@ -77,6 +97,9 @@ export const main = (request, context, cb) => {
 
         let up: UserProfile
 
+        /**
+         * Validate Tokens
+         */
         customerService.validateCustomer(tokenType, bearerToken)
             .then((userProfile: UserProfile) => {
                 up = userProfile
@@ -84,6 +107,10 @@ export const main = (request, context, cb) => {
                 return deviceService.describeThingShadowsByUser(userProfile)
             }).then((thingShadows) => {
             console.log('thingShadows:', JSON.stringify(thingShadows, null, 2))
+
+            /**
+             * Lookup my devices, shadows, meta and figure out what to answer
+             */
 
             return deviceService.discoverByShadows(thingShadows)
         }).then((deviceMeta) => {
@@ -104,6 +131,8 @@ export const main = (request, context, cb) => {
             };
 
             console.log('discovery answer:', JSON.stringify(answer, null, 2))
+
+            // Return
 
             cb(null, answer)
         }).catch(errorHandler)

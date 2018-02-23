@@ -41,7 +41,17 @@ export class CustomerService {
         this.client = new AWS.DynamoDB.DocumentClient()
     }
 
+    /**
+     * Creates/Updates an User
+     *
+     * @param {string} tokenType token type. Use 'UserId' for local debugging (not used in production fwiw)
+     * @param {string} token token. Use the 'userId' if tokenType is 'UserId'
+     * @returns {Bluebird<UserProfile>} User Profile, as a Promise
+     */
     validateCustomer(tokenType: string, token: string): Promise<UserProfile> {
+        /**
+         * Debugging Hack. Love it
+         */
         if ('UserId' == tokenType) {
             return Promise.resolve(token)
                 .then((token) => {
@@ -64,7 +74,10 @@ export class CustomerService {
                         short_id: item.Items[0]['short_id']
                     } as UserProfile)
                 })
-        } else if ('BearerToken' == tokenType) {
+        } else if ('BearerToken' == tokenType) { /* The real functionality */
+            /*
+             * Query Amazon
+             */
             const urlToLoad = `https://api.amazon.com/user/profile?access_token=${encodeURIComponent(token)}`
 
             let userProfile: UserProfile
@@ -78,8 +91,10 @@ export class CustomerService {
                 .then((up: UserProfile) => {
                     userProfile = up
 
+                    // Shorten Up
                     const shortId = up.user_id.replace(/^amzn1\.account\./, '')
 
+                    // Always Update. Creates it if needed btw
                     return this.client.update({
                         TableName: this.customerTable,
                         Key: {
@@ -115,6 +130,11 @@ export class CustomerService {
         }
     }
 
+    /**
+     * Lookups an user by an api key id
+     * @param {string} apiKeyId api key id
+     * @returns {Bluebird<UserProfile>} user, as a bluebird promise
+     */
     findByApiKeyId(apiKeyId: string): Promise<UserProfile> {
         const firstStep = Promise.resolve().then(() => {
             return this.client.query({

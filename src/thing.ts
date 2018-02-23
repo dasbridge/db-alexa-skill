@@ -51,6 +51,9 @@ export interface ThingSpec {
 
 export const FULL_TO_SHORT = /^[A-Z0-9]+_(.*)/
 
+/**
+ * Manages Thing Provisioning
+ */
 export class ThingService {
     private thingsTable: string
 
@@ -67,6 +70,11 @@ export class ThingService {
         this.client = new AWS.DynamoDB.DocumentClient()
     }
 
+    /**
+     * Stub to return certificates. Currently Hardcoded
+     *
+     * @returns {Bluebird<{[p: string]: string}>} map of URL / PEM Certificate
+     */
     downloadCertificates(): Promise<{ [key: string]: string }> {
         const resultCertificates: { [key: string]: string } = {}
 
@@ -102,6 +110,11 @@ export class ThingService {
         return Promise.resolve(resultCertificates)
     }
 
+    /**
+     * Creates a new Thing
+     * @param {ThingRequest} r request
+     * @returns {Bluebird<ThingSpec>} promise to a thingSpec
+     */
     generateNewThing(r: ThingRequest): Promise<ThingSpec> {
         let returnValues: ThingSpec = ({}) as ThingSpec
 
@@ -111,12 +124,21 @@ export class ThingService {
 
         let thingName = r.user.short_id + '_' + r.thingId
 
+        /**
+         * Root Certificates
+         */
         return this.downloadCertificates().then((rootCertificates) => {
             returnValues.rootCertificates = rootCertificates
         }).then(() => this.iot.describeEndpoint().promise()).then((endpointResponse) => {
+            /**
+             * Endpoints
+             */
             returnValues.endpoint = endpointResponse.endpointAddress
             // }).then(() => { // TODO: Validate Existing Thing Id
         }).then(() => {
+            /**
+             * Validate requested with available Thing Types
+             */
             return this.client.get({
                 TableName: this.thingTypesTable,
                 Key: {
@@ -124,20 +146,32 @@ export class ThingService {
                 }
             }).promise()
         }).then((result) => {
+            /**
+             * Assign thing policy from previous table result
+             */
             console.log('thing lookup:', JSON.stringify(result, null, 2))
 
             returnValues.thingPolicy = result.Item["thing_policy"]
         }).then(() => {
+            /**
+             * Create Keys and Cert
+             */
             return this.iot.createKeysAndCertificate({
                 setAsActive: true
             }).promise()
         }).then(cert => {
+            /**
+             * Fills Parameters from previous call
+             */
             returnValues.certificateArn = cert.certificateArn
             returnValues.certificateId = cert.certificateId
             returnValues.certificatePem = cert.certificatePem
             returnValues.publicKey = cert.keyPair.PublicKey
             returnValues.privateKey = cert.keyPair.PrivateKey
         }).then(() => {
+            /**
+             * Creates Thing
+             */
             const createThingRequest = {
                 "thingName": thingName,
                 "thingTypeName": r.thingType,
@@ -152,12 +186,18 @@ export class ThingService {
 
             return this.iot.createThing(createThingRequest).promise()
         }).then((createThingResponse) => {
+            /**
+             * Assigns from previous call
+             */
             console.log('createThingResponse:', JSON.stringify(createThingResponse, null, 2))
 
             returnValues.thingArn = createThingResponse.thingArn
             returnValues.thingId = createThingResponse.thingId
             returnValues.thingName = createThingResponse.thingName
         }).then(() => {
+            /**
+             * Attaches policy
+             */
             let attachPolicyRequest = {
                 policyName: returnValues.thingPolicy,
                 target: returnValues.certificateArn,
@@ -165,11 +205,17 @@ export class ThingService {
 
             return this.iot.attachPolicy(attachPolicyRequest).promise()
         }).then(() => {
+            /**
+             * Attaches Principal
+             */
             return this.iot.attachThingPrincipal({
                 thingName: returnValues.thingName,
                 principal: returnValues.certificateArn,
             }).promise()
         }).then(() => {
+            /**
+             * Stores on DynamoDB
+             */
             return this.client.put({
                 TableName: this.thingsTable,
                 Item: {
@@ -188,6 +234,11 @@ export class ThingService {
         })
     }
 
+    /**
+     * List all things owned by user
+     * @param {UserProfile} userProfile user to lookup
+     * @returns {Bluebird<ThingDescription[]>} things owned by user
+     */
     listThingsByUser(userProfile: UserProfile): Promise<ThingDescription[]> {
         let result: ThingDescription[] = []
 
@@ -222,6 +273,13 @@ export class ThingService {
             })
     }
 
+    /**
+     * describe a device (thing, fwiw)
+     *
+     * @param {UserProfile} userProfile user
+     * @param {string} deviceId device id (thing id)
+     * @returns {Bluebird<ThingDescription>}
+     */
     describeDevice(userProfile: UserProfile, deviceId: string): Promise<ThingDescription> {
         let result: ThingDescription = null
 

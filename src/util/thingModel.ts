@@ -1,3 +1,6 @@
+/**
+ * Thing Metadata Stuff
+ */
 export interface ThingMetadata {
     reported: any
 

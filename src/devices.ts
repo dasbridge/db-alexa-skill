@@ -57,6 +57,13 @@ export class DeviceService {
         this.iot = new AWS.Iot()
     }
 
+    /**
+     * Returns all thing shadows for a given user's device
+     *
+     * @param {UserProfile} up user
+     * @param {string} thingName (optional: thing name)
+     * @returns {Bluebird<ThingMetadataMap>} maps of things shadows and their metadatas
+     */
     describeThingShadowsByUser(up: UserProfile, thingName?: string): Promise<ThingMetadataMap> {
         let endpointAddress: Iot.EndpointAddress;
 
@@ -71,6 +78,7 @@ export class DeviceService {
                 endpoint: endpointAddress
             })
 
+            // Returns all things on DynamoDB
             return Promise.resolve(up)
                 .then((up) => {
                     let queryParams: QueryInput = {
@@ -90,6 +98,7 @@ export class DeviceService {
                     return this.client.query(queryParams).promise()
                 })
         }).then((deviceItems) => {
+            // For those, build an array of promises to retrieve shadows and their metadata
             const deviceShadowPromises = deviceItems.Items.map((t) => {
                 const thingName = t['thing_name']
                 return Promise.resolve(thingName).then((thingName) => {
@@ -119,6 +128,7 @@ export class DeviceService {
 
             return Promise.all(deviceShadowPromises)
         }).then((deviceResults) => {
+            // Assemble as a map, then return
             const result: { [key: string]: ThingMetadata } = {}
 
             deviceResults.forEach((x) => {
@@ -129,6 +139,11 @@ export class DeviceService {
         })
     }
 
+    /**
+     * Main Discovery Entrypoint. Lookups an user things and performs metadata building for the discovery endpoint
+     * @param {ThingMetadataMap} thingShadows
+     * @returns {Bluebird<AlexaDiscoveryEndpoint[]>}
+     */
     discoverByShadows(thingShadows: ThingMetadataMap): Promise<AlexaDiscoveryEndpoint[]> {
         const result: AlexaDiscoveryEndpoint[] = []
 
@@ -145,6 +160,13 @@ export class DeviceService {
         return Promise.resolve(result)
     }
 
+    /**
+     * This section actually builds the alexa metadata required
+     *
+     * @param {string} endpointId endpoint id
+     * @param {ThingMetadata} thingMeta thing metadata / shadow
+     * @returns {AlexaDiscoveryEndpoint}
+     */
     discoverEndpoint(endpointId: string, thingMeta: ThingMetadata): AlexaDiscoveryEndpoint {
         //console.log('arguments:', JSON.stringify(arguments, null, 2))
         const friendlyNameToUse = FULL_TO_SHORT.exec(endpointId)[1]
@@ -221,11 +243,14 @@ export class DeviceService {
             result.displayCategories.push(k)
         }
 
-        // metadata.reported."Alexa.TemperatureSensor"."3".temp.timestamp
-
         return result
     }
 
+    /**
+     * Helper Method to filter out inactive devices
+     * @param ts timestamp (epoch seconds)
+     * @returns {boolean} true if less than 30 minutes
+     */
     private isLessThan30Minutes(ts: any): boolean {
         const typeOf = (typeof ts)
 
@@ -240,6 +265,13 @@ export class DeviceService {
         return tsAsNumber >= minimumTime
     }
 
+    /**
+     * ReportState Handler
+     * @param request alexa request
+     * @param {UserProfile} userProfile user
+     * @param {string} endpointId emd[pomt od
+     * @returns {Bluebird<{event: {header; endpoint: {endpointId: string}; payload: {}}; context: {properties: any[]}}>} reportstate result
+     */
     reportState(request: any, userProfile: UserProfile, endpointId: string) {
         return this.describeThingShadowsByUser(userProfile, endpointId).then((report) => {
             const thingMeta = report[endpointId]
@@ -313,6 +345,14 @@ export class DeviceService {
 
     }
 
+    /**
+     * SetState Handler
+     * @param request alexa request
+     * @param {UserProfile} userProfile iser
+     * @param {string} endpointId emd[pomt od
+     * @param payload setState payload
+     * @returns {Bluebird<any>} response
+     */
     setState(request: any, userProfile: UserProfile, endpointId: string, payload: any): Promise<any> {
         const requestType = request.directive.header.namespace
         const requestVersion = request.directive.header.payloadVersion
@@ -379,6 +419,13 @@ export class DeviceService {
         }).then(() => Promise.resolve(answer))
     }
 
+    /**
+     * Handler for 'powerController' requests
+     * @param request alexa request
+     * @param {UserProfile} userProfile iser
+     * @param {string} endpointId endpoint id
+     * @returns {Bluebird<any>} response
+     */
     powerController(request: any, userProfile: UserProfile, endpointId: string): Promise<any> {
         let desiredState = "ON"
 

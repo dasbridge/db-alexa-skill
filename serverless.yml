@@ -16,7 +16,18 @@ provider:
   iamRoleStatements:
     - Effect: "Allow"
       Action:
-        - "*"
+        - "iot:DescribeEndpoint"
+        - "iot:CreateKeysAndCertificate"
+        - "iot:CreateThing"
+        - "iot:AttachThingPrincipal"
+        - "iot:AttachPolicy"
+        - "iot:GetThingShadow"
+        - "iot:UpdateThingShadow"
+        - "dynamodb:GetItem"
+        - "dynamodb:Query"
+        - "dynamodb:UpdateItem"
+        - "dynamodb:PutItem"
+        - "dynamodb:DescribeTable"
       Resource: "*"
 
 functions:

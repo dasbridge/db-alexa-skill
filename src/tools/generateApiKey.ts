@@ -71,7 +71,7 @@ let restApiId, restApiStage: string
 
         return apiGatewayClient.createApiKey({
             enabled: true,
-            name: "new-db-key",
+            name: "key-" + email,
             stageKeys: [{restApiId: restApiId, stageName: restApiStage}]
         }).promise()
     }).then((apiKey: ApiKey) => {

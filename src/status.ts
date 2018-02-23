@@ -11,6 +11,12 @@ require('source-map-support').install();
 import {customerService} from "./customer";
 import {ThingRequest, thingService} from "./thing";
 
+/**
+ * Status Method. Returns User Status based on API Key
+ * @param request api request (API Gateway)
+ * @param context lambda context
+ * @param cb callback
+ */
 export const main = (request, context, cb) => {
     console.log('request', JSON.stringify(request, null, 2))
 

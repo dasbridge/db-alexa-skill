@@ -1,5 +1,4 @@
 # TODO
 
- * Ditch serverless hardcoded into AWS EC2 SSM Paramters
- * Write config guide
-
+  * Implement a couple of missing interfaces
+  * Reconfigure logging to be optional according to environment variables

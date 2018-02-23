@@ -34,6 +34,9 @@ export const defaultErrorHandler = function (cb: Callback) {
     }
 }
 
+/**
+ * Device API Lambda. Used by the /devices endpoint
+ */
 export const main: ProxyHandler = (request, context, cb) => {
     let deviceId: string = null
 

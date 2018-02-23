@@ -16,6 +16,11 @@ export interface ARNElements {
     relativeId?: string
 }
 
+/**
+ * Parses an ARN
+ * @param {string} arnString
+ * @returns {ARNElements} elements of the ARN
+ */
 export const parseArn = (arnString: string): ARNElements => {
     let result = arnString.split(':').reduce(function (result, part, idx) {
         result[COMPONENTS[idx]] = part
@@ -25,6 +30,12 @@ export const parseArn = (arnString: string): ARNElements => {
     return result as ARNElements
 }
 
+/**
+ * Given an ARN, extracts the DynamoDB Table Name
+ * @param {string} arn
+ * @param {string} defaultValue
+ * @returns {string} dynamodb table name
+ */
 export const tableNameFromARN = (arn: string, defaultValue?: string): string => {
     const parsedArn = parseArn(arn)
 

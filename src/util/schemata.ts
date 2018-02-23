@@ -1,5 +1,11 @@
 import * as Ajv from 'ajv'
 
+/**
+ * Validate an json-schema. Throws an error if anything fails
+ *
+ * @param {object} object
+ * @param {object} schema
+ */
 export const validateSchema = (x: object, schema: object) => {
     const ajv = new Ajv()
 

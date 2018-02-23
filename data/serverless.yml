@@ -3,6 +3,7 @@ service:
 
 plugins:
   - serverless-stack-output
+
 provider:
   name: aws
   runtime: nodejs6.10
